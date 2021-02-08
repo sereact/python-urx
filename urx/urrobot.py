@@ -259,6 +259,21 @@ class URRobot(object):
         jts = self.secmon.get_joint_data(wait)
         return [jts["q_actual0"], jts["q_actual1"], jts["q_actual2"], jts["q_actual3"], jts["q_actual4"], jts["q_actual5"]]
 
+
+    def get_inverse_kin(self, pose, qnear=None, maxPositionError=0.0001, maxOrientationError=0.0001)
+        """
+        Inverse kinematic transformation (tool space -> joint space). Solution
+        closest to current joint positions is returned, unless qnear defines one.
+        """
+
+        if qnear is None:
+            qnear = getj()
+
+        prog = _format_get_kin(pose, qnear, maxPositionError, maxOrientationError)
+        self.send_program(prog)
+        #TODO fix return
+        return 0 
+
     def speedx(self, command, velocities, acc, min_time):
         vels = [round(i, self.max_float_length) for i in velocities]
         vels.append(acc)
@@ -303,6 +318,14 @@ class URRobot(object):
         tpose.append(vel)
         tpose.append(radius)
         return "{}({}[{},{},{},{},{},{}], a={}, v={}, r={})".format(command, prefix, *tpose)
+
+    def _format_get_kin(self, x, q, pos_err, ori_err):
+        x = [round(i, self.max_float_length) for i in x]
+        q = [round(i, self.max_float_length) for i in q]
+        pos_err = [round(i, self.max_float_length) for i in pos_err]
+        ori_err = [round(i, self.max_float_length) for i in ori_err]
+        
+        return "get_inverse_kin(p[{},{},{},{},{},{}], qnear=[{},{},{},{},{},{}], maxPositionError={}, maxOrientationError={})".format(x, q, pos_err, ori_err)
 
     def movex(self, command, tpose, acc=0.01, vel=0.01, wait=True, relative=False, threshold=None):
         """
