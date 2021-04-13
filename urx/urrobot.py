@@ -7,9 +7,11 @@ http://support.universal-robots.com/URRobot/RemoteAccess
 import logging
 import numbers
 import collections
+import numpy as np
 
 from urx import urrtmon
 from urx import ursecmon
+
 
 __author__ = "Olivier Roulet-Dubonnet"
 __copyright__ = "Copyright 2011-2015, Sintef Raufoss Manufacturing"
@@ -110,6 +112,35 @@ class URRobot(object):
         """
         prog = "set_tcp(p[{}, {}, {}, {}, {}, {}])".format(*tcp)
         self.send_program(prog)
+
+    def execute_in_force_mode(self, trajectory_commands, task_frame, selection_vector, wrench, type, limits):
+
+        # TODO setup payload by variable
+        self.send_program("set_payload(0.75)\n")
+        self.send_program("zero_ftsensor()\n")
+
+        force_mode_path = "def myProg():\n" \
+                          "\tforce_mode(tool_pose(), {1}, {2}, {3}, {4})\n" \
+                          "\tsleep(0.5)\n".format(np.array2string(task_frame, separator=','),
+                                                  np.array2string(selection_vector, separator=','),
+                                                  np.array2string(wrench, separator=','),
+                                                  type,
+                                                  np.array2string(limits, separator=','))
+
+        for cmd in trajectory_commands:
+            force_mode_path += "\t" + self.movel_to_str(cmd, relative=True) + "\tsleep(1.0)\n"
+        force_mode_path += "end\n"
+
+        self.send_program(force_mode_path)
+
+        # TODO: dont do this
+        import time 
+        time.sleep(2)
+        
+        self.send_program("end_force_mode()\n")
+
+        return force_mode_path + "end_force_mode()\n"
+
 
     def set_payload(self, weight, cog=None):
         """
@@ -285,6 +316,12 @@ class URRobot(object):
         """
         return self.movex("movel", tpose, acc=acc, vel=vel, wait=wait, relative=relative, threshold=threshold)
 
+    def movel_to_str(self, tpose, acc=0.01, vel=0.01, wait=True, relative=False, threshold=None):
+        """
+        Send a movel command to the robot. See URScript documentation.
+        """
+        return self.movex_to_str("movel", tpose, acc=acc, vel=vel, wait=wait, relative=relative, threshold=threshold)
+
     def movep(self, tpose, acc=0.01, vel=0.01, wait=True, relative=False, threshold=None):
         """
         Send a movep command to the robot. See URScript documentation.
@@ -304,6 +341,14 @@ class URRobot(object):
         tpose.append(radius)
         return "{}({}[{},{},{},{},{},{}], a={}, v={}, r={})".format(command, prefix, *tpose)
 
+    def _format_get_kin(self, x, q, pos_err, ori_err):
+        x = [round(i, self.max_float_length) for i in x]
+        q = [round(i, self.max_float_length) for i in q]
+        pos_err = [round(i, self.max_float_length) for i in pos_err]
+        ori_err = [round(i, self.max_float_length) for i in ori_err]
+        
+        return "get_inverse_kin(p[{},{},{},{},{},{}], qnear=[{},{},{},{},{},{}], maxPositionError={}, maxOrientationError={})".format(x, q, pos_err, ori_err)
+
     def movex(self, command, tpose, acc=0.01, vel=0.01, wait=True, relative=False, threshold=None):
         """
         Send a move command to the robot. since UR robotene have several methods this one
@@ -317,6 +362,21 @@ class URRobot(object):
         if wait:
             self._wait_for_move(tpose[:6], threshold=threshold)
             return self.getl()
+
+    def movex_to_str(self, command, tpose, acc=0.01, vel=0.01, wait=True, relative=False, threshold=None):
+        """
+        Send a move command to the robot. since UR robotene have several methods this one
+        sends whatever is defined in 'command' string
+        """
+        if relative:
+            l = self.getl()
+            tpose = [v + l[i] for i, v in enumerate(tpose)]
+        prog = self._format_move(command, tpose, acc, vel, prefix="p")
+        #self.send_program(prog)
+        #if wait:
+        #    self._wait_for_move(tpose[:6], threshold=threshold)
+        #    return self.getl()
+        return prog
 
     def getl(self, wait=False, _log=True):
         """
