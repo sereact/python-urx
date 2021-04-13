@@ -41,6 +41,32 @@ class Robot(URRobot):
             tcp = tcp.pose_vector
         URRobot.set_tcp(self, tcp)
 
+    def execute_in_force_mode(self, trajectory_commands,
+                              task_frame=np.asarray([0, 0, 0, 0, 0, 0]), selection_vector=np.asarray([0, 0, 1, 0, 0, 0]),
+                              wrench=np.asarray([0.0, 0.0, 10.0, 0.0, 0.0, 0.0]), type=2,
+                              limits=np.asarray([0.1, 0.1, 0.15, 0.3490658503988659, 0.3490658503988659, 0.3490658503988659])):
+        """
+        Executes constructed commands in the specified force mode. Please see URScript API reference doc - force_mode(). All
+        values must be provided as numpy arrays.
+        :param trajectory_commands: list of commands that will be executed using force mode in string
+        :param task_frame: A pose vector that defines the force frame relative to the base frame.
+        :param selection_vector: A 6d vector of 0s and 1s. 1 means that the robot will be compliant in the corresponding axis of the task frame.
+        :param wrench: The forces/torques the robot will apply to its environment.
+        :param type: An integer [1;3] specifying how the robot interprets the force frame.
+        :param limits:  6d vector. For compliant axes, these values are the maximum allowed tcp speed along/about the axis.
+        :return: executed command
+        """
+
+        #assert isinstance(trajectory_commands, list) and len(trajectory_commands) > 0 and \
+        #       isinstance(trajectory_commands[0], str)
+        #assert isinstance(task_frame, np.ndarray) and isinstance(selection_vector, np.ndarray) and \
+        #       isinstance(wrench, np.ndarray) and isinstance(limits, np.ndarray)
+
+        return URRobot.execute_in_force_mode(self, trajectory_commands, task_frame, selection_vector, wrench, type, limits)
+
+
+
+
     def set_csys(self, transform):
         """
         Set reference coordinate system to use
