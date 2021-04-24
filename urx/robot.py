@@ -43,8 +43,9 @@ class Robot(URRobot):
 
     def execute_in_force_mode(self, trajectory_commands,
                               task_frame=np.asarray([0, 0, 0, 0, 0, 0]), selection_vector=np.asarray([0, 0, 1, 0, 0, 0]),
-                              wrench=np.asarray([0.0, 0.0, 10.0, 0.0, 0.0, 0.0]), type=2,
-                              limits=np.asarray([0.1, 0.1, 0.15, 0.3490658503988659, 0.3490658503988659, 0.3490658503988659])):
+                              wrench=np.asarray([0.0, 0.0, 6.0, 0.0, 0.0, 0.0]), type=2,
+                              limits=np.asarray([0.01, 0.01, 0.09, 0.3490658503988659, 0.3490658503988659, 0.3490658503988659]), 
+                              payload=0.25, wait=True, timeout=5, drop_off=False):
         """
         Executes constructed commands in the specified force mode. Please see URScript API reference doc - force_mode(). All
         values must be provided as numpy arrays.
@@ -62,10 +63,7 @@ class Robot(URRobot):
         #assert isinstance(task_frame, np.ndarray) and isinstance(selection_vector, np.ndarray) and \
         #       isinstance(wrench, np.ndarray) and isinstance(limits, np.ndarray)
 
-        return URRobot.execute_in_force_mode(self, trajectory_commands, task_frame, selection_vector, wrench, type, limits)
-
-
-
+        return URRobot.execute_in_force_mode(self, trajectory_commands, task_frame, selection_vector, wrench, type, limits, payload, wait, timeout=timeout,drop_off=drop_off)
 
     def set_csys(self, transform):
         """

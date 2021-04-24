@@ -8,6 +8,8 @@ import logging
 import numbers
 import collections
 import numpy as np
+from timeit import default_timer as timer
+import time
 
 from urx import urrtmon
 from urx import ursecmon
@@ -113,29 +115,28 @@ class URRobot(object):
         prog = "set_tcp(p[{}, {}, {}, {}, {}, {}])".format(*tcp)
         self.send_program(prog)
 
-    def execute_in_force_mode(self, trajectory_commands, task_frame, selection_vector, wrench, type, limits):
+    def execute_in_force_mode(self, trajectory_commands, task_frame, selection_vector, wrench, type, limits, payload, wait, timeout=5, drop_off=False):
 
         # TODO setup payload by variable
-        self.send_program("set_payload(0.75)\n")
+        self.send_program(f"set_payload({payload})\n")
         self.send_program("zero_ftsensor()\n")
 
         force_mode_path = "def myProg():\n" \
                           "\tforce_mode(tool_pose(), {1}, {2}, {3}, {4})\n" \
-                          "\tsleep(0.5)\n".format(np.array2string(task_frame, separator=','),
+                          "\tsleep(0.2)\n".format(np.array2string(task_frame, separator=','),
                                                   np.array2string(selection_vector, separator=','),
                                                   np.array2string(wrench, separator=','),
                                                   type,
                                                   np.array2string(limits, separator=','))
 
         for cmd in trajectory_commands:
-            force_mode_path += "\t" + self.movel_to_str(cmd, relative=True) + "\tsleep(1.0)\n"
+            force_mode_path += "\t" + self.movel_to_str(cmd, relative=False, vel=0.02, acc=0.05) + "\tsleep(0.01)\n"
         force_mode_path += "end\n"
 
         self.send_program(force_mode_path)
-
-        # TODO: dont do this
-        import time 
-        time.sleep(2)
+        
+        if wait:
+            self._is_robot_moving(trajectory_commands[-1], timeout=timeout, drop_off=drop_off)
         
         self.send_program("end_force_mode()\n")
 
@@ -229,6 +230,50 @@ class URRobot(object):
         """
         prog = "set_tool_voltage(%s)" % (val)
         self.send_program(prog)
+
+    def _is_robot_moving(self, target, threshold=None, timeout=5, joints=False, sleep_per_cycle=.3, drop_off=False):
+        """
+        wait until the robot is notmoving anymore when in forcemove
+        """
+        self.logger.debug("Waiting for the robot to stop the movement")
+
+        start_dist = self._get_dist(target, joints)
+
+        if threshold is None:
+            threshold = 0.001 # 1 mm/s, we wait 1/5 s between our measurements
+            if threshold < 0.001:  # roboten precision is limited
+                threshold = 0.001
+            self.logger.debug("No threshold set, setting it to %s", threshold)
+
+        count = 0
+        start_time = timer()
+        while True:
+            if not self.is_running():
+                raise RobotException("Robot stopped")
+            dist_1 = self._get_dist(target, joints)
+            time.sleep(sleep_per_cycle)
+            dist_2 = self._get_dist(target, joints)
+            
+
+            # we calculate the velocity
+            dist_diff = np.abs(dist_2 - dist_1)
+            print(f"dist_diff: {dist_diff}")
+            self.logger.debug("Actual robot velocity is: %s, target dist is %s", dist_diff, threshold)
+            
+            # break conditions
+            if dist_diff < threshold:
+                self.logger.debug("we are threshold(%s) close to target, move has ended", threshold)
+                print('BREAKING 0')
+                return
+            count += 1
+            if timeout < np.abs((timer() - start_time)):
+                print('BREAKING 1')
+                self.logger.debug("Robot still moving formore than {} seconds... Breaking".format(timeout))
+                return
+            if self.get_digital_in(4) and not drop_off:
+                print('BREAKING 3')
+                self.logger.debug("the eagle has landed... we have contact")
+                return
 
     def _wait_for_move(self, target, threshold=None, timeout=5, joints=False):
         """
@@ -372,6 +417,7 @@ class URRobot(object):
             l = self.getl()
             tpose = [v + l[i] for i, v in enumerate(tpose)]
         prog = self._format_move(command, tpose, acc, vel, prefix="p")
+        #print(f"movel_to_str: {prog}")
         #self.send_program(prog)
         #if wait:
         #    self._wait_for_move(tpose[:6], threshold=threshold)
