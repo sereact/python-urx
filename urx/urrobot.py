@@ -295,16 +295,29 @@ class URRobot(object):
                 raise RobotException("Robot stopped")
             dist = self._get_dist(target, joints)
             self.logger.debug("distance to target is: %s, target dist is %s", dist, threshold)
+            act_joints = URRobot.getj(self, wait=True)
+            if self.has_object and not self.get_digital_in(4, wait=True):
+                self.has_object = False
+                raise ValueError
+            if self.has_object and act_joints[0] > np.deg2rad(140) and act_joints[0] < np.deg2rad(160):
+                self.waiting_cb()
+                print('!!!!!!!!!!!!!!!!!!!!!!!!!!Bin Transition Callback!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            else:
+                print('nope')
+
             if not self.secmon.is_program_running():
+                
+
                 if dist < threshold:
                     self.logger.debug("we are threshold(%s) close to target, move has ended", threshold)
+                    self.has_object = False
                     return
                 count += 1
                 if count > timeout * 10:
                     raise RobotException("Goal not reached but no program has been running for {} seconds. dist is {}, threshold is {}, target is {}, current pose is {}".format(timeout, dist, threshold, target, URRobot.getl(self)))
             else:
                 count = 0
-
+        
     def _get_dist(self, target, joints=False):
         if joints:
             return self._get_joints_dist(target)
