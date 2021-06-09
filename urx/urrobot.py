@@ -301,12 +301,8 @@ class URRobot(object):
                 raise ValueError
             if self.has_object and act_joints[0] > np.deg2rad(140) and act_joints[0] < np.deg2rad(160):
                 self.waiting_cb()
-                print('!!!!!!!!!!!!!!!!!!!!!!!!!!Bin Transition Callback!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-            else:
-                print('nope')
 
             if not self.secmon.is_program_running():
-                
 
                 if dist < threshold:
                     self.logger.debug("we are threshold(%s) close to target, move has ended", threshold)
